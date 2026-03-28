@@ -9,6 +9,7 @@ import com.example.modul4.TokenManager
 
 object ApiClient {
     private const val BASE_URL = "https://reqres.in/"
+    private const val API_KEY = "reqres_0cff0532b60649adac62cbc39fff8aae"
 
     fun getApiService(context: Context): ApiService {
         val tokenManager = TokenManager(context)
@@ -16,6 +17,10 @@ object ApiClient {
         // Interceptor untuk menyisipkan token ke header Authorization
         val authInterceptor = Interceptor { chain ->
             val requestBuilder = chain.request().newBuilder()
+
+            // Menambahkan x-API-Key untuk semua request
+            requestBuilder.addHeader("x-api-key", API_KEY)
+
             tokenManager.getToken()?.let { token ->
                 requestBuilder.addHeader("Authorization", "Bearer $token")
             }

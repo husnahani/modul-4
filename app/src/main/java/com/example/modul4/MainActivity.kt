@@ -1,22 +1,28 @@
+package com.example.modul4
+
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.*
 import kotlinx.coroutines.launch
-import com.example.modul4.TokenManager
-
-// Pastikan untuk mengimpor ApiClient, ApiService, LoginRequest, dll dari paket Anda
+import com.example.modul4.data.remote.LoginRequest
+import com.example.modul4.data.remote.User
+import com.example.modul4.service.ApiClient
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,24 +41,26 @@ fun AppNavigation() {
     val context = LocalContext.current
     val tokenManager = remember { TokenManager(context) }
 
-    // Tentukan layar awal berdasarkan ketersediaan token
-    val startDestination = if (tokenManager.getToken() != null) "home" else "login"
+    val startDestination =
+        if (tokenManager.getToken() != null) "home" else "login"
 
     NavHost(navController = navController, startDestination = startDestination) {
+
         composable("login") {
-            LoginScreen(onLoginSuccess = {
+            LoginScreen {
                 navController.navigate("home") {
-                    popUpTo("login") { inclusive = true } // Hapus layar login dari riwayat
+                    popUpTo("login") { inclusive = true }
                 }
-            })
+            }
         }
+
         composable("home") {
-            HomeScreen(onLogout = {
+            HomeScreen {
                 tokenManager.clearToken()
                 navController.navigate("login") {
                     popUpTo("home") { inclusive = true }
                 }
-            })
+            }
         }
     }
 }
@@ -64,16 +72,20 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
     val apiService = remember { ApiClient.getApiService(context) }
     val tokenManager = remember { TokenManager(context) }
 
-    var email by remember { mutableStateOf("eve.holt@reqres.in") } // Kredensial default API
+    var email by remember { mutableStateOf("eve.holt@reqres.in") }
     var password by remember { mutableStateOf("cityslicka") }
     var isLoading by remember { mutableStateOf(false) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Aplikasi Beresin", style = MaterialTheme.typography.headlineMedium)
+
+        Text("Aplikasi Beresin", style = MaterialTheme.typography.headlineMedium)
+
         Spacer(modifier = Modifier.height(32.dp))
 
         OutlinedTextField(
@@ -82,15 +94,17 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             label = { Text("Email") },
             modifier = Modifier.fillMaxWidth()
         )
+
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Kata Sandi") },
+            label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
             modifier = Modifier.fillMaxWidth()
         )
+
         Spacer(modifier = Modifier.height(32.dp))
 
         Button(
@@ -106,8 +120,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
                             Toast.makeText(context, "Login Gagal", Toast.LENGTH_SHORT).show()
                         }
                     } catch (e: Exception) {
-                        Toast.makeText(context, "Terjadi Kesalahan Jaringan",
-                            Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Error jaringan", Toast.LENGTH_SHORT).show()
                     } finally {
                         isLoading = false
                     }
@@ -116,7 +129,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             enabled = !isLoading
         ) {
-            Text(if (isLoading) "Memproses..." else "Masuk")
+            Text(if (isLoading) "Loading..." else "Login")
         }
     }
 }
@@ -124,13 +137,12 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
 @Composable
 fun HomeScreen(onLogout: () -> Unit) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     val apiService = remember { ApiClient.getApiService(context) }
 
     var users by remember { mutableStateOf<List<User>>(emptyList()) }
     var errorMessage by remember { mutableStateOf("") }
+    var isLoading by remember { mutableStateOf(true) }
 
-    // Memanggil API secara otomatis saat layar pertama kali dibuka
     LaunchedEffect(Unit) {
         try {
             val response = apiService.getUsers()
@@ -140,36 +152,99 @@ fun HomeScreen(onLogout: () -> Unit) {
                 errorMessage = "Gagal mengambil data"
             }
         } catch (e: Exception) {
-            errorMessage = "Terjadi Kesalahan Jaringan"
+            errorMessage = "Terjadi kesalahan jaringan"
+        } finally {
+            isLoading = false
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // App Bar Sederhana
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Daftar Pengguna", style = MaterialTheme.typography.titleLarge)
-            Button(onClick = onLogout) { Text("Keluar") }
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFF5F5F5))
+    ) {
+
+        // HEADER
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Halo 👋", style = MaterialTheme.typography.titleMedium)
+            Text("Daftar Pengguna", style = MaterialTheme.typography.headlineSmall)
         }
 
-        // List Data (Pengganti RecyclerView)
-        if (errorMessage.isNotEmpty()) {
-            Text(errorMessage, modifier = Modifier.padding(16.dp), color =
-                MaterialTheme.colorScheme.error)
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-                items(users) { user ->
-                    Card(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text(text = "${user.firstName} ${user.lastName}", style =
-                                MaterialTheme.typography.titleMedium)
-                            Text(text = user.email, style = MaterialTheme.typography.bodyMedium)
-                        }
+        Button(
+            onClick = onLogout,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth()
+        ) {
+            Text("Logout")
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        when {
+            isLoading -> {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+
+            errorMessage.isNotEmpty() -> {
+                Text(
+                    errorMessage,
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+
+            else -> {
+                LazyColumn(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    items(users) { user ->
+                        UserCard(user)
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun UserCard(user: User) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(6.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .size(50.dp)
+                    .background(Color(0xFF6C63FF), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = user.firstName.first().toString(),
+                    color = Color.White
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column {
+                Text(
+                    text = "${user.firstName} ${user.lastName}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Text(
+                    text = user.email,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.Gray
+                )
             }
         }
     }
